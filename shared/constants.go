@@ -7,4 +7,7 @@ const (
 	COLLECTION_MEMBER = "member"
 	COLLECTION_ROOM   = "room"
 	HOMEPAGE          = "chat.html"
+	MT_MESSAGE        = "message"
+	MT_LEAVE          = "leaving"
+	MT_NEWUSER        = "new_user"
 )

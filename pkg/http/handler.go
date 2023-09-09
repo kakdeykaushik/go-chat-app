@@ -70,6 +70,7 @@ func NewRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 func ChatRoom(w http.ResponseWriter, r *http.Request) {
+	// Upgrade connection
 	socket, err := upgrader.Upgrade(w, r, w.Header())
 	shared.HandleError(err, "Failed to Upgrade")
 	defer socket.Close()
@@ -77,6 +78,7 @@ func ChatRoom(w http.ResponseWriter, r *http.Request) {
 	username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
 	fmt.Printf("Username, roomId: %v, %v\n", username, roomId)
 
+	// Get room
 	myRoom, err := roomSvc.GetRoom(roomId)
 	shared.HandleError(err, fmt.Sprintf("Error getting room with roomId %s", roomId))
 
@@ -92,15 +94,18 @@ func ChatRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if current user is already in the room
 	if roomSvc.IsNewMember(myRoom, username) {
 		member := memberSvc.CreateMember(username, socket)
 		roomSvc.AddMember(myRoom, member)
 
+		// Update conn and inmem room data
 		liveMemberConn.Save(username, member.Conn.Socket)
 		roomToMember.Save(roomId, myRoom.Members)
 
-		go sendMessage(username, myRoom, "new user", fmt.Sprintf("%s joined.", username))
+		go sendMessage(username, myRoom, shared.MT_NEWUSER, fmt.Sprintf("%s joined.", username))
 	} else {
+		// Update conn and inmem room data
 		liveMemberConn.Save(username, socket)
 		roomToMember.Save(roomId, myRoom.Members)
 	}
@@ -111,25 +116,28 @@ func ChatRoom(w http.ResponseWriter, r *http.Request) {
 		// SentAt  time.Time
 	}
 
+	// Read messages
 	for {
 		err := socket.ReadJSON(&data)
 
 		if websocket.IsCloseError(err, websocket.CloseGoingAway) {
+			// Remove member
 			liveMemberConn.Delete(username)
 			roomSvc.RemoveMember(myRoom, username)
 			roomToMember.Save(roomId, myRoom.Members)
 
-			go sendMessage(username, myRoom, "leaving", fmt.Sprintf("%s left the room", username))
+			// waiting not required for this goroutine as this is fire and forget task. think about it again.
+			// this message is not required as per biz logic since this is going offline. Instead create feature for member to exit room and then show this msg
+			// go sendMessage(username, myRoom, shared.MT_LEAVE, fmt.Sprintf("%s left the room", username))
 			return
 		}
 
 		shared.HandleError(err, "Failed to read message")
-		go sendMessage(username, myRoom, "message", data.Message)
+		go sendMessage(username, myRoom, shared.MT_MESSAGE, data.Message)
 	}
 }
 
 func sendMessage(sender string, rec any, messageType string, message string) {
-
 	switch receiver := rec.(type) {
 
 	case *domain.Room:

@@ -14,10 +14,3 @@ type Member struct {
 	Username string
 	Conn     *Connection
 }
-
-// type MemberDB interface {
-// 	Get(id string) (*Member, error)
-// 	List() ([]*Member, error)
-// 	Save(p *Member) error
-// 	Delete(id string) error
-// }
