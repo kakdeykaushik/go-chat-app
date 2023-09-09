@@ -15,9 +15,6 @@ type Member struct {
 	Conn     *Connection
 }
 
-// redundant
-func (m *Member) UpdateConn(s *websocket.Conn) {}
-
 // type MemberDB interface {
 // 	Get(id string) (*Member, error)
 // 	List() ([]*Member, error)

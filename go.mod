@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/gorilla/websocket v1.5.0
+	github.com/pkg/errors v0.9.1
 	go.mongodb.org/mongo-driver v1.12.1
 )
 

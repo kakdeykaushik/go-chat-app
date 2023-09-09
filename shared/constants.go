@@ -6,4 +6,5 @@ const (
 	DB_CHATROOM       = "chatroom"
 	COLLECTION_MEMBER = "member"
 	COLLECTION_ROOM   = "room"
+	HOMEPAGE          = "chat.html"
 )

@@ -5,24 +5,29 @@ import (
 	"chat-app/pkg/domain"
 	"chat-app/shared"
 	"context"
-	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type roomSvc struct {
-	DB domain.Storage
+	// DB domain.Storage
 }
 
-func NewRoomSvc(store domain.Storage) roomSvc {
-	return roomSvc{DB: store}
+func NewRoomSvc() roomSvc {
+	// return roomSvc{DB: store}
+	return roomSvc{}
+}
+
+func getCollection(dbName, collectioName string) *mongo.Collection {
+	client := db.GetClient()
+	col := client.Database(dbName).Collection(collectioName)
+	return col
 }
 
 func (rs roomSvc) GetRoom(roomId string) (*domain.Room, error) {
 
-	client := db.GetClient()
-
-	col := client.Database("chatroom").Collection("room")
+	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
 	filter := bson.M{"roomId": roomId}
 
 	var result *domain.Room
@@ -37,22 +42,20 @@ func (rs roomSvc) CreateRoom() (*domain.Room, error) {
 	roomId := "abcde"
 	room := &domain.Room{RoomId: roomId, Members: nil}
 
-	client := db.GetClient()
+	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
 
-	col := client.Database("chatroom").Collection("room")
 	_, err := col.InsertOne(context.TODO(), room)
 	shared.HandleError(err, "Error while creating room")
 	return room, err
 }
-func (rs roomSvc) AddMember(room *domain.Room, member *domain.Member) {
-	client := db.GetClient()
-	col := client.Database("chatroom").Collection("room")
 
-	filter := bson.M{"roomId": room.RoomId}
+func (rs roomSvc) AddMember(room *domain.Room, member *domain.Member) {
 	room.Members = append(room.Members, member)
 
-	newRoom, err := col.ReplaceOne(context.TODO(), filter, &room)
-	fmt.Println(newRoom)
+	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+	filter := bson.M{"roomId": room.RoomId}
+
+	_, err := col.ReplaceOne(context.TODO(), filter, &room)
 	shared.HandleError(err, "Error while adding member to the room")
 }
 
@@ -62,13 +65,12 @@ func (rs roomSvc) RemoveMember(room *domain.Room, username string) {
 
 	for i, member := range room.Members {
 		if member.Username == username {
-
 			room.Members = shared.RemoveIndex(room.Members, i)
-
 			// update db
-			client := db.GetClient()
-			col := client.Database("chatroom").Collection("room")
-			_, err := col.UpdateByID(context.TODO(), room.RoomId, room)
+			col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+			filter := bson.M{"roomId": room.RoomId}
+
+			_, err := col.ReplaceOne(context.TODO(), filter, &room)
 			shared.HandleError(err, "Error while removing member")
 
 			break

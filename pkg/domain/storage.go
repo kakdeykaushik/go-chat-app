@@ -1,8 +1,8 @@
 package domain
 
 type Storage interface {
-	Get(K string, k any) (any, error)
+	Get(K string) (any, error)
 	List() ([]any, error)
-	Save(V any) error
+	Save(K, V any) error
 	Delete(K string) error
 }

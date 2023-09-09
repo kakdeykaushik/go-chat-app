@@ -9,54 +9,72 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
 var (
-	upgrader = websocket.Upgrader{}
+	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
+		username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
+		return !(username == "" || roomId == "")
+	}}
 
-	store1 = db.NewDB(shared.STORE_MONGO, shared.DB_CHATROOM, shared.COLLECTION_MEMBER)
-	store2 = db.NewDB(shared.STORE_MONGO, shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+	liveMemberConn = db.NewDB(shared.STORE_MEMORY)
+	roomToMember   = db.NewDB(shared.STORE_MEMORY)
 
-	memberSvc = app.NewMemberSvc(store1)
-	roomSvc   = app.NewRoomSvc(store2)
-
-	liveConn = new(sync.Map)
-	rooms    = new(sync.Map)
+	memberSvc = app.NewMemberSvc()
+	roomSvc   = app.NewRoomSvc()
 )
 
 func Home(w http.ResponseWriter, r *http.Request) {
-	content, err := os.ReadFile("chat.html")
+	content, err := os.ReadFile(shared.HOMEPAGE)
 	shared.HandleError(err, "Failed to read HTML file")
 	w.Write(content)
+}
+
+func ViewRoom(w http.ResponseWriter, r *http.Request) {
+	roomId := r.URL.Query().Get("roomId")
+
+	room, err := roomSvc.GetRoom(roomId)
+	if err != nil {
+		w.Write([]byte("Something went wrong"))
+		fmt.Printf("Error: %v", err)
+		return
+	}
+
+	type Resp struct {
+		RoomId string   `json:"roomId"`
+		Member []string `json:"member"`
+	}
+
+	var members []string
+	for _, member := range room.Members {
+		members = append(members, member.Username)
+	}
+
+	var resp = Resp{RoomId: roomId, Member: members}
+	json.NewEncoder(w).Encode(&resp)
 }
 
 func NewRoom(w http.ResponseWriter, r *http.Request) {
 	room, err := roomSvc.CreateRoom()
 	shared.HandleError(err, "Error while creating new room")
-	fmt.Printf("New room created: %s\n", room.RoomId)
 
 	// todo; move struct outside
-	var ss = struct {
+	type Resp struct {
 		RoomId string `json:"roomId"`
-	}{room.RoomId}
+	}
 
-	json.NewEncoder(w).Encode(&ss)
+	var resp = Resp{RoomId: room.RoomId}
+	json.NewEncoder(w).Encode(&resp)
 }
 
 func ChatRoom(w http.ResponseWriter, r *http.Request) {
-	// debate - should be Upgraded right away or after some basic check like valid roomId
 	socket, err := upgrader.Upgrade(w, r, w.Header())
 	shared.HandleError(err, "Failed to Upgrade")
 	defer socket.Close()
 
-	fmt.Println("Protocol/IP: ", socket.LocalAddr().Network(), socket.LocalAddr().String())
-
-	username := r.URL.Query().Get("email")
-	roomId := r.URL.Query().Get("roomId")
-
+	username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
 	fmt.Printf("Username, roomId: %v, %v\n", username, roomId)
 
 	myRoom, err := roomSvc.GetRoom(roomId)
@@ -70,34 +88,22 @@ func ChatRoom(w http.ResponseWriter, r *http.Request) {
 			Sender      string `json:"sender"`
 			Message     string `json:"message"`
 		}{"information", "admin", "room not found"}
-		socket.WriteJSON(msg)
+		_ = socket.WriteJSON(msg)
 		return
 	}
 
 	if roomSvc.IsNewMember(myRoom, username) {
 		member := memberSvc.CreateMember(username, socket)
-		// myRoom.Members = append(myRoom.Members, member)
 		roomSvc.AddMember(myRoom, member)
-		liveConn.Store(username, member.Conn.Socket)
-		rooms.Store(roomId, myRoom.Members)
 
-		go sendMessage(socket, myRoom, "new user", username, fmt.Sprintf("%s joined.", username))
+		liveMemberConn.Save(username, member.Conn.Socket)
+		roomToMember.Save(roomId, myRoom.Members)
+
+		go sendMessage(username, myRoom, "new user", fmt.Sprintf("%s joined.", username))
 	} else {
-		member, err := memberSvc.GetMember(username)
-		shared.HandleError(err, fmt.Sprintf("Error getting member with username %s. Creating new member", username))
-
-		member.UpdateConn(socket) // redundant
-		liveConn.Store(username, member.Conn.Socket)
-		// rooms.Store(roomId, myRoom.Members)
-
-		go sendMessage(socket, member, "already joined", username, fmt.Sprintf("%s is already connected.", username))
-		// currentConnector := member
-
-		// currentConnector := memberSvc.CreateMember(username, socket)
-		// go sendMessage(socket, currentConnector, "already joined", username, fmt.Sprintf("%s is already connected.", username))
-		// go sendMessage(socket, member, "new connection", username, fmt.Sprintf("%s is trying to connect from somewhere else", username))
+		liveMemberConn.Save(username, socket)
+		roomToMember.Save(roomId, myRoom.Members)
 	}
-	fmt.Println(myRoom.Members)
 
 	// todo: move struct
 	var data struct {
@@ -109,71 +115,48 @@ func ChatRoom(w http.ResponseWriter, r *http.Request) {
 		err := socket.ReadJSON(&data)
 
 		if websocket.IsCloseError(err, websocket.CloseGoingAway) {
+			liveMemberConn.Delete(username)
 			roomSvc.RemoveMember(myRoom, username)
+			roomToMember.Save(roomId, myRoom.Members)
 
-			go sendMessage(socket, myRoom, "leaving", username, fmt.Sprintf("%s left the room", username))
+			go sendMessage(username, myRoom, "leaving", fmt.Sprintf("%s left the room", username))
 			return
 		}
 
 		shared.HandleError(err, "Failed to read message")
-		go sendMessage(socket, myRoom, "message", username, data.Message)
+		go sendMessage(username, myRoom, "message", data.Message)
 	}
 }
 
-func sendMessage(socket *websocket.Conn, myRoom any, messageType string, sender string, message string) {
+func sendMessage(sender string, rec any, messageType string, message string) {
 
-	fmt.Printf("room - %+v, sender %+v \n", myRoom, sender)
+	switch receiver := rec.(type) {
 
+	case *domain.Room:
+		rm, _ := roomToMember.Get(receiver.RoomId)
+		members, ok := rm.([]*domain.Member)
+		if !ok {
+			fmt.Println("not parsed to []*domain.Member")
+		}
+		for _, member := range members {
+			go send(messageType, sender, message, *member)
+		}
+
+	case *domain.Member:
+		go send(messageType, sender, message, *receiver)
+
+	default:
+		fmt.Println("invalid receiver")
+	}
+}
+
+func send(messageType string, sender string, message string, receiver domain.Member) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered. Error:\n", r)
 		}
 	}()
 
-	switch receiver := myRoom.(type) {
-
-	case *domain.Room:
-		rm, _ := rooms.Load(receiver.RoomId)
-		r := rm.([]*domain.Member)
-		for _, member := range r {
-			// member./
-			send(messageType, sender, message, *member)
-		}
-
-		// for _, member := range receiver.Members {
-		// 	// todo: move this struct outside
-		// 	msg := &struct {
-		// 		MessageType string `json:"messageType"`
-		// 		Sender      string `json:"sender"`
-		// 		Message     string `json:"message"`
-		// 	}{messageType, sender, message}
-
-		// 	s, ok := liveConn.Load(member.Username)
-		// 	if !ok {
-		// 		fmt.Println(s, ok)
-		// 	}
-		// 	sock, ok := s.(*websocket.Conn)
-		// 	if !ok {
-		// 		fmt.Println(s, ok)
-		// 	}
-
-		// 	fmt.Printf("Sending message to: %v - %s\n", member.Username, message)
-		// 	err := sock.WriteJSON(msg)
-		// 	// err := member.Conn.Socket.WriteJSON(msg)
-		// 	shared.HandleError(err, "Failed to Write message")
-		// }
-
-	case *domain.Member:
-		send(messageType, sender, message, *receiver)
-
-	default:
-		fmt.Println("invalid receiver")
-
-	}
-
-}
-
-func send(messageType string, sender string, message string, receiver domain.Member) {
 	// todo: move struct
 	msg := &struct {
 		MessageType string `json:"messageType"`
@@ -181,16 +164,18 @@ func send(messageType string, sender string, message string, receiver domain.Mem
 		Message     string `json:"message"`
 	}{messageType, sender, message}
 
-	s, ok := liveConn.Load(receiver.Username)
-	if !ok {
-		fmt.Println(s, ok)
+	s, err := liveMemberConn.Get(receiver.Username)
+	if err != nil {
+		fmt.Printf("cannt send to %v\n", receiver.Username)
+		return
 	}
+
 	sock, ok := s.(*websocket.Conn)
 	if !ok {
 		fmt.Println(s, ok)
 	}
 
 	fmt.Printf("Sending message to: %v - %s\n", receiver.Username, message)
-	err := sock.WriteJSON(msg)
+	err = sock.WriteJSON(msg)
 	shared.HandleError(err, "Failed to Write message")
 }

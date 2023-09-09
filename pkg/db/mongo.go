@@ -3,7 +3,6 @@ package db
 import (
 	"chat-app/pkg/domain"
 	"context"
-	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,7 +23,7 @@ type mongoStore struct {
 
 var client *mongo.Client
 
-func NewMongoStore(config *Configuration) domain.Storage {
+func newMongoStore(config *Configuration) domain.Storage {
 	// uri := os.Getenv("mongo_uri")
 	uri := "mongodb://localhost:27017"
 	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
@@ -54,10 +53,12 @@ func GetClient() *mongo.Client {
 
 }
 
-func (ms mongoStore) Get(id string, result any) (any, error) {
-	col := ms.Client.Database(ms.Config.DBName).Collection(ms.Config.Collection)
-	// retu
-	filter := bson.M{"roomId": id}
+func (ms mongoStore) Get(id string) (any, error) {
+
+	return nil, nil
+	// col := ms.Client.Database(ms.Config.DBName).Collection(ms.Config.Collection)
+	// // retu
+	// filter := bson.M{"roomId": id}
 
 	// var result *D
 
@@ -73,13 +74,13 @@ func (ms mongoStore) Get(id string, result any) (any, error) {
 	// }
 
 	// fmt.Printf("mango1 - %+v %T\n", result, result)
-	err := col.FindOne(context.TODO(), filter).Decode(&result)
-	fmt.Printf("mango2 - %+v %T\n", result, result)
+	// err := col.FindOne(context.TODO(), filter).Decode(&result)
+	// fmt.Printf("mango2 - %+v %T\n", result, result)
 
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return result, nil
 }
 
 func (ms mongoStore) List() ([]any, error) {
@@ -97,7 +98,7 @@ func (ms mongoStore) List() ([]any, error) {
 	return result, nil
 }
 
-func (ms mongoStore) Save(data any) error {
+func (ms mongoStore) Save(K, data any) error {
 	col := ms.Client.Database(ms.Config.DBName).Collection(ms.Config.Collection)
 	_, err := col.InsertOne(context.TODO(), data)
 	return err
