@@ -1,0 +1,68 @@
+<html>
+  <div>
+    <input id="email" type="email" size="40" />
+    <input id="roomId" type="text" size="40" value="abcde" />
+    <button onclick="connect()">Connect</button>
+    <pre id="socket-connection"></pre>
+
+    <input id="input" type="text" size="40" />
+    <button onclick="send()">Send</button>
+    <pre id="output"></pre>
+  </div>
+  <style>
+    html {
+      text-align: center;
+      font-size: 16px;
+    }
+    div {
+      padding: 1rem;
+    }
+    #input {
+      font-size: 16px;
+    }
+    p {
+      font-size: 16px;
+    }
+  </style>
+  <script>
+    var input = document.getElementById("input");
+    var output = document.getElementById("output");
+
+    function connect() {
+      const email = document.getElementById("email").value;
+      const roomId = document.getElementById("roomId").value;
+      socket = new WebSocket(`ws://localhost:8000/room/?email=${email}&roomId=${roomId}`);
+
+      socket.onopen = function () {
+        output.innerHTML += `Connected ${email}\n`; // improvement
+      };
+
+      socket.onmessage = function (e) {
+        data = JSON.parse(e.data);
+
+        const messageType = data.messageType;
+        const sender = data.sender;
+        const message = data.message;
+
+        if (messageType === "new user") {
+          val = `[INFO]: ${message}\n`;
+        } else {
+          val = `${sender}: ${message}\n`;
+        }
+
+        output.innerHTML += val;
+      };
+    }
+
+    function send() {
+      if (input.value === "") {
+        // todo: add info msg
+        return
+      }
+
+      data = { message: input.value };
+      socket.send(JSON.stringify(data));
+      input.value = "";
+    }
+  </script>
+</html>
