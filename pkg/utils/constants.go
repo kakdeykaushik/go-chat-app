@@ -1,4 +1,4 @@
-package shared
+package utils
 
 const (
 	STORE_MEMORY      = "memory"
@@ -6,7 +6,7 @@ const (
 	DB_CHATROOM       = "chatroom"
 	COLLECTION_MEMBER = "member"
 	COLLECTION_ROOM   = "room"
-	HOMEPAGE          = "chat.html"
+	HOMEPAGE          = "../static/chat.html"
 	MT_MESSAGE        = "message"
 	MT_LEAVE          = "leaving"
 	MT_NEWUSER        = "new_user"

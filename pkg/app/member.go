@@ -1,9 +1,11 @@
 package app
 
 import (
-	"chat-app/pkg/domain"
-	"chat-app/shared"
+	"chat-app/pkg/entity"
+	model "chat-app/pkg/models"
+	"chat-app/pkg/utils"
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -20,31 +22,45 @@ func NewMemberSvc() memberSvc {
 	return memberSvc{}
 }
 
-func (ms memberSvc) CreateMember(username string, socket *websocket.Conn) *domain.Member {
+func (ms memberSvc) CreateMember(username string, socket *websocket.Conn) *model.Member {
 
 	m, err := ms.GetMember(username)
 	if err == mongo.ErrNoDocuments {
-		conn := domain.Connection{Socket: socket, Mutex: sync.Mutex{}}
-		member := &domain.Member{Username: username, Conn: &conn}
 
-		col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_MEMBER)
-		_, err := col.InsertOne(context.TODO(), member)
+		conn := model.Connection{Socket: socket, Mutex: &sync.Mutex{}}
+		member := &model.Member{Username: username, Conn: &conn}
 
-		shared.HandleError(err, "Error while creating member")
+		col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_MEMBER)
+		memberEntity := utils.ModelToEntityMember(member)
+		_, err := col.InsertOne(context.TODO(), memberEntity)
+
+		if err != nil {
+			fmt.Println("Error while creating member", err)
+			return nil
+		}
 		return member
 	}
 
-	shared.HandleError(err, "Error creating member")
+	if err != nil {
+		fmt.Println("Error creating member", err)
+		return nil
+	}
+
 	return m
 }
 
-func (ms memberSvc) GetMember(username string) (*domain.Member, error) {
-	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_MEMBER)
+func (ms memberSvc) GetMember(username string) (*model.Member, error) {
+	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_MEMBER)
 
-	var member *domain.Member
+	var memberEntity *entity.Member
 
 	filter := bson.M{"username": username}
-	err := col.FindOne(context.Background(), filter).Decode(&member)
+	err := col.FindOne(context.Background(), filter).Decode(&memberEntity)
 
+	if err == mongo.ErrNoDocuments {
+		return nil, err
+	}
+
+	member := utils.EntityToModelMember(memberEntity)
 	return member, err
 }

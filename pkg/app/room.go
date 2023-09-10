@@ -2,9 +2,11 @@ package app
 
 import (
 	"chat-app/pkg/db"
-	"chat-app/pkg/domain"
-	"chat-app/shared"
+	"chat-app/pkg/entity"
+	model "chat-app/pkg/models"
+	"chat-app/pkg/utils"
 	"context"
+	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,61 +27,79 @@ func getCollection(dbName, collectioName string) *mongo.Collection {
 	return col
 }
 
-func (rs roomSvc) GetRoom(roomId string) (*domain.Room, error) {
+func (rs roomSvc) GetRoom(roomId string) (*model.Room, error) {
 
-	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
 	filter := bson.M{"roomId": roomId}
 
-	var result *domain.Room
+	var result *entity.Room
 	err := col.FindOne(context.TODO(), filter).Decode(&result)
-	shared.HandleError(err, "Error while getting room")
+	if err != nil {
+		fmt.Println("Error while getting room", err)
+		return nil, err
+	}
 
-	return result, nil
+	room := utils.EntityToModelRoom(result)
+
+	return room, nil
 }
 
-func (rs roomSvc) CreateRoom() (*domain.Room, error) {
+func (rs roomSvc) CreateRoom() (*model.Room, error) {
 	// roomId := uuid.New().String()[:5]
 	roomId := "abcde"
-	room := &domain.Room{RoomId: roomId, Members: nil}
+	room := &model.Room{RoomId: roomId, Members: []*model.Member{}}
 
-	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
 
-	_, err := col.InsertOne(context.TODO(), room)
-	shared.HandleError(err, "Error while creating room")
+	roomEntity := utils.ModelToEntityRoom(room)
+	_, err := col.InsertOne(context.TODO(), roomEntity)
+	if err != nil {
+		fmt.Println("Error while creating room", err)
+		return nil, err
+	}
 	return room, err
 }
 
-func (rs roomSvc) AddMember(room *domain.Room, member *domain.Member) {
+func (rs roomSvc) AddMember(room *model.Room, member *model.Member) {
 	room.Members = append(room.Members, member)
 
-	col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
 	filter := bson.M{"roomId": room.RoomId}
 
-	_, err := col.ReplaceOne(context.TODO(), filter, &room)
-	shared.HandleError(err, "Error while adding member to the room")
+	roomEntity := utils.ModelToEntityRoom(room)
+	_, err := col.ReplaceOne(context.TODO(), filter, &roomEntity)
+	if err != nil {
+		fmt.Println("Error while adding member to the room", err)
+	}
 }
 
-func (rs roomSvc) RemoveMember(room *domain.Room, username string) {
+func (rs roomSvc) RemoveMember(room *model.Room, username string) error {
 	// room.Lock()
 	// defer room.Unlock()
 
 	for i, member := range room.Members {
 		if member.Username == username {
-			room.Members = shared.RemoveIndex(room.Members, i)
+			room.Members = utils.RemoveIndex(room.Members, i)
 			// update db
-			col := getCollection(shared.DB_CHATROOM, shared.COLLECTION_ROOM)
+			col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
 			filter := bson.M{"roomId": room.RoomId}
 
-			_, err := col.ReplaceOne(context.TODO(), filter, &room)
-			shared.HandleError(err, "Error while removing member")
+			roomEntity := utils.ModelToEntityRoom(room)
+
+			_, err := col.ReplaceOne(context.TODO(), filter, &roomEntity)
+			if err != nil {
+				fmt.Println("Error while removing member", err)
+				return err
+			}
 
 			break
 		}
 	}
 
+	return nil
 }
 
-func (rs roomSvc) IsNewMember(room *domain.Room, memberUsername string) bool {
+func (rs roomSvc) IsNewMember(room *model.Room, memberUsername string) bool {
 	for _, member := range room.Members {
 		if member.Username == memberUsername {
 			return false

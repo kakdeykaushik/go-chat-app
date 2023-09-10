@@ -1,4 +1,4 @@
-package domain
+package types
 
 type Storage interface {
 	Get(K string) (any, error)

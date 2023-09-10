@@ -1,7 +1,7 @@
 package db
 
 import (
-	"chat-app/pkg/domain"
+	"chat-app/pkg/types"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -14,7 +14,7 @@ type inMemoryStorage struct {
 var singleInMemInstance *inMemoryStorage
 
 // singleton
-func newInMemoryStore() domain.Storage {
+func newInMemoryStore() types.Storage {
 	if singleInMemInstance == nil {
 		singleInMemInstance = &inMemoryStorage{items: new(sync.Map)}
 	}

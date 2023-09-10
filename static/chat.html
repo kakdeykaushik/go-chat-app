@@ -31,7 +31,9 @@
     function connect() {
       const email = document.getElementById("email").value;
       const roomId = document.getElementById("roomId").value;
-      socket = new WebSocket(`ws://localhost:8000/room/?email=${email}&roomId=${roomId}`);
+      socket = new WebSocket(
+        `ws://localhost:8000/room/?email=${email}&roomId=${roomId}`
+      );
 
       socket.onopen = function () {
         output.innerHTML += `Connected ${email}\n`; // improvement
@@ -57,7 +59,7 @@
     function send() {
       if (input.value === "") {
         // todo: add info msg
-        return
+        return;
       }
 
       data = { message: input.value };

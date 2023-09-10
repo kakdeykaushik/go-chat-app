@@ -1,4 +1,4 @@
-package domain
+package model
 
 type Room struct {
 	RoomId  string    `json:"roomId" bson:"roomId"`

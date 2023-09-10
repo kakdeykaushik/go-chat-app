@@ -3,8 +3,8 @@ package http
 import (
 	"chat-app/pkg/app"
 	"chat-app/pkg/db"
-	"chat-app/pkg/domain"
-	"chat-app/shared"
+	model "chat-app/pkg/models"
+	"chat-app/pkg/utils"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -19,17 +19,55 @@ var (
 		return !(username == "" || roomId == "")
 	}}
 
-	liveMemberConn = db.NewDB(shared.STORE_MEMORY)
-	roomToMember   = db.NewDB(shared.STORE_MEMORY)
+	liveMemberConn = db.NewDB(utils.STORE_MEMORY)
+	roomToMember   = db.NewDB(utils.STORE_MEMORY)
 
 	memberSvc = app.NewMemberSvc()
 	roomSvc   = app.NewRoomSvc()
 )
 
 func Home(w http.ResponseWriter, r *http.Request) {
-	content, err := os.ReadFile(shared.HOMEPAGE)
-	shared.HandleError(err, "Failed to read HTML file")
+	content, err := os.ReadFile(utils.HOMEPAGE)
+	if err != nil {
+		fmt.Println(err)
+		resp := utils.StatusInternalServerError()
+
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&resp)
+
+		return
+	}
+
 	w.Write(content)
+}
+
+func LeaveRoom(w http.ResponseWriter, r *http.Request) {
+	username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
+
+	room, err := roomSvc.GetRoom(roomId)
+	if err != nil {
+		data := model.MessageBody{Message: "room does not exist"}
+
+		resp := utils.StatusOK(data)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(&resp)
+
+		return
+	}
+
+	roomSvc.RemoveMember(room, username)
+	liveMemberConn.Delete(username)
+	roomToMember.Save(roomId, room.Members)
+
+	message := fmt.Sprintf("%v left the room", username)
+	go sendMessage("admin", room, utils.MT_LEAVE, message)
+
+	data := model.MessageBody{Message: "room left successfully"}
+
+	resp := utils.StatusOK(data)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(&resp)
+
 }
 
 func ViewRoom(w http.ResponseWriter, r *http.Request) {
@@ -37,14 +75,13 @@ func ViewRoom(w http.ResponseWriter, r *http.Request) {
 
 	room, err := roomSvc.GetRoom(roomId)
 	if err != nil {
-		w.Write([]byte("Something went wrong"))
-		fmt.Printf("Error: %v", err)
-		return
-	}
+		var data = model.MessageBody{Message: "Unable to get room"}
 
-	type Resp struct {
-		RoomId string   `json:"roomId"`
-		Member []string `json:"member"`
+		resp := utils.StatusOK(data)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(&resp)
+
+		return
 	}
 
 	var members []string
@@ -52,45 +89,58 @@ func ViewRoom(w http.ResponseWriter, r *http.Request) {
 		members = append(members, member.Username)
 	}
 
-	var resp = Resp{RoomId: roomId, Member: members}
+	var data = model.RoomDataBody{RoomId: roomId, Member: members}
+
+	resp := utils.StatusOK(data)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)
 }
 
 func NewRoom(w http.ResponseWriter, r *http.Request) {
 	room, err := roomSvc.CreateRoom()
-	shared.HandleError(err, "Error while creating new room")
 
-	// todo; move struct outside
-	type Resp struct {
-		RoomId string `json:"roomId"`
+	if err != nil {
+		fmt.Println("Error while creating new room", err)
+		data := model.MessageBody{Message: "unable to create room. please try again later"}
+		resp := utils.StatusOK(data)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(&resp)
+		return
 	}
 
-	var resp = Resp{RoomId: room.RoomId}
+	data := model.NewRoomBody{RoomId: room.RoomId}
+
+	resp := utils.StatusOK(data)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)
 }
 
 func ChatRoom(w http.ResponseWriter, r *http.Request) {
 	// Upgrade connection
 	socket, err := upgrader.Upgrade(w, r, w.Header())
-	shared.HandleError(err, "Failed to Upgrade")
+	if err != nil {
+		fmt.Println("Error while upgrading protocol: ", err)
+		resp := utils.StatusBadRequest("Unable to connect")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(&resp)
+		return
+	}
 	defer socket.Close()
 
 	username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
 	fmt.Printf("Username, roomId: %v, %v\n", username, roomId)
 
 	// Get room
-	myRoom, err := roomSvc.GetRoom(roomId)
-	shared.HandleError(err, fmt.Sprintf("Error getting room with roomId %s", roomId))
+	myRoom, _ := roomSvc.GetRoom(roomId)
 
 	if myRoom == nil {
 		fmt.Println("room not found")
-		// todo: move struct outside
-		msg := &struct {
-			MessageType string `json:"messageType"`
-			Sender      string `json:"sender"`
-			Message     string `json:"message"`
-		}{"information", "admin", "room not found"}
-		_ = socket.WriteJSON(msg)
+
+		data := model.MessageBody{Message: "room not found"}
+
+		resp := utils.StatusOK(data)
+		socket.WriteJSON(resp)
+
 		return
 	}
 
@@ -100,57 +150,63 @@ func ChatRoom(w http.ResponseWriter, r *http.Request) {
 		roomSvc.AddMember(myRoom, member)
 
 		// Update conn and inmem room data
-		liveMemberConn.Save(username, member.Conn.Socket)
+		liveMemberConn.Save(username, socket)
 		roomToMember.Save(roomId, myRoom.Members)
 
-		go sendMessage(username, myRoom, shared.MT_NEWUSER, fmt.Sprintf("%s joined.", username))
+		go sendMessage(username, myRoom, utils.MT_NEWUSER, fmt.Sprintf("%s joined.", username))
 	} else {
 		// Update conn and inmem room data
 		liveMemberConn.Save(username, socket)
 		roomToMember.Save(roomId, myRoom.Members)
 	}
 
-	// todo: move struct
-	var data struct {
-		Message string // `json:"message"`
-		// SentAt  time.Time
-	}
+	var message model.ChatMessageReceive
 
 	// Read messages
 	for {
-		err := socket.ReadJSON(&data)
+		err := socket.ReadJSON(&message)
 
 		if websocket.IsCloseError(err, websocket.CloseGoingAway) {
 			// Remove member
 			liveMemberConn.Delete(username)
-			roomSvc.RemoveMember(myRoom, username)
-			roomToMember.Save(roomId, myRoom.Members)
-
-			// waiting not required for this goroutine as this is fire and forget task. think about it again.
-			// this message is not required as per biz logic since this is going offline. Instead create feature for member to exit room and then show this msg
-			// go sendMessage(username, myRoom, shared.MT_LEAVE, fmt.Sprintf("%s left the room", username))
 			return
 		}
 
-		shared.HandleError(err, "Failed to read message")
-		go sendMessage(username, myRoom, shared.MT_MESSAGE, data.Message)
+		// Rare edge case
+		_, err = liveMemberConn.Get(username)
+		if err != nil {
+			fmt.Println("Member not available")
+			return
+		}
+
+		if err != nil {
+			fmt.Println("Failed to read message", err)
+		}
+		go sendMessage(username, myRoom, utils.MT_MESSAGE, message.Message)
 	}
 }
 
 func sendMessage(sender string, rec any, messageType string, message string) {
 	switch receiver := rec.(type) {
 
-	case *domain.Room:
-		rm, _ := roomToMember.Get(receiver.RoomId)
-		members, ok := rm.([]*domain.Member)
-		if !ok {
-			fmt.Println("not parsed to []*domain.Member")
+	case *model.Room:
+		rm, err := roomToMember.Get(receiver.RoomId)
+		if err != nil {
+			fmt.Println("Unable to get members")
+			return
 		}
+
+		members, ok := rm.([]*model.Member)
+		if !ok {
+			fmt.Println("not parsed to []*model.Member")
+			return
+		}
+
 		for _, member := range members {
 			go send(messageType, sender, message, *member)
 		}
 
-	case *domain.Member:
+	case *model.Member:
 		go send(messageType, sender, message, *receiver)
 
 	default:
@@ -158,19 +214,14 @@ func sendMessage(sender string, rec any, messageType string, message string) {
 	}
 }
 
-func send(messageType string, sender string, message string, receiver domain.Member) {
+func send(messageType string, sender string, message string, receiver model.Member) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered. Error:\n", r)
 		}
 	}()
 
-	// todo: move struct
-	msg := &struct {
-		MessageType string `json:"messageType"`
-		Sender      string `json:"sender"`
-		Message     string `json:"message"`
-	}{messageType, sender, message}
+	msg := model.ChatMessageSend{MessageType: messageType, Sender: sender, Message: message}
 
 	s, err := liveMemberConn.Get(receiver.Username)
 	if err != nil {
@@ -181,9 +232,12 @@ func send(messageType string, sender string, message string, receiver domain.Mem
 	sock, ok := s.(*websocket.Conn)
 	if !ok {
 		fmt.Println(s, ok)
+		return
 	}
 
 	fmt.Printf("Sending message to: %v - %s\n", receiver.Username, message)
 	err = sock.WriteJSON(msg)
-	shared.HandleError(err, "Failed to Write message")
+	if err != nil {
+		fmt.Println("Failed to Write message", err)
+	}
 }

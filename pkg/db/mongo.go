@@ -1,7 +1,7 @@
 package db
 
 import (
-	"chat-app/pkg/domain"
+	"chat-app/pkg/types"
 	"context"
 	"os"
 
@@ -34,10 +34,9 @@ func GetClient() *mongo.Client {
 
 	client = c
 	return client
-
 }
 
-func newMongoStore(config *Configuration) domain.Storage {
+func newMongoStore(config *Configuration) types.Storage {
 	client := GetClient()
 	return &mongoStore{Client: client, Config: config}
 }

@@ -1,18 +1,18 @@
 package db
 
 import (
-	"chat-app/pkg/domain"
-	"chat-app/shared"
+	"chat-app/pkg/types"
+	"chat-app/pkg/utils"
 )
 
 // factory
-func NewDB(name string, configs ...string) domain.Storage {
+func NewDB(name string, configs ...string) types.Storage {
 	switch name {
 
-	case shared.STORE_MEMORY:
+	case utils.STORE_MEMORY:
 		return newInMemoryStore()
 
-	case shared.STORE_MONGO:
+	case utils.STORE_MONGO:
 		var config = &Configuration{configs[0], configs[1]}
 		return newMongoStore(config)
 

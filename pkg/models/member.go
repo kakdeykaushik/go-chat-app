@@ -1,4 +1,4 @@
-package domain
+package model
 
 import (
 	"sync"
@@ -8,8 +8,9 @@ import (
 
 type Connection struct {
 	Socket *websocket.Conn
-	sync.Mutex
+	*sync.Mutex
 }
+
 type Member struct {
 	Username string
 	Conn     *Connection
