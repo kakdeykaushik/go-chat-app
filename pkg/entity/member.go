@@ -1,5 +1,5 @@
 package entity
 
 type Member struct {
-	Username string `json:"username"`
+	Username string `bson:"username"`
 }

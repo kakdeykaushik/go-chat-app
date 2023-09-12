@@ -20,7 +20,7 @@ func RemoveIndex[T any](s []T, i int) []T {
 	return append(s[:i], s[i+1:]...)
 }
 
-// HandleError checks if an error occurred. If so, it logs a formatted error message
+// FatalError checks if an error occurred. If so, it logs a formatted error message
 // and exits the program with a fatal error.
 //
 // Parameters:
@@ -30,8 +30,8 @@ func RemoveIndex[T any](s []T, i int) []T {
 // Example usage:
 //
 //	err := someFunction()
-//	HandleError(err, "Error while performing someFunction")
-func HandleError(err error, msg string) {
+//	FatalError(err, "Error while performing someFunction")
+func FatalError(err error, msg string) {
 	if err != nil {
 		log.Fatalf("%s - %v\n", msg, err)
 	}

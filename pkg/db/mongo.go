@@ -1,58 +1,68 @@
 package db
 
 import (
-	"chat-app/pkg/types"
 	"context"
 	"os"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Configuration struct {
-	DBName     string
-	Collection string
+type mongoStore[T any] struct {
+	client *mongo.Client
+	cfg    *Configuration
 }
 
-type mongoStore struct {
-	Client *mongo.Client
-	Config *Configuration
-}
+var singleMongoClient *mongo.Client
 
-var client *mongo.Client
-
-func GetClient() *mongo.Client {
-	if client != nil {
-		return client
+// singleton
+func GetClient() (*mongo.Client, error) {
+	if singleMongoClient != nil {
+		return singleMongoClient, nil
 	}
 
 	uri := os.Getenv("mongo_uri")
+
 	c, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
-	if err != nil {
-		return nil
-	}
-
-	client = c
-	return client
+	singleMongoClient = c
+	return singleMongoClient, err
 }
 
-func newMongoStore(config *Configuration) types.Storage {
-	client := GetClient()
-	return &mongoStore{Client: client, Config: config}
+func NewMongoStore[T any](db *mongo.Client, config *Configuration) *mongoStore[T] {
+	return &mongoStore[T]{client: db, cfg: config}
 }
 
-func (ms *mongoStore) Get(id string) (any, error) {
+func (ms *mongoStore[T]) Get(uid string) (*T, error) {
+	var result T
+
+	col := ms.client.Database(ms.cfg.DBName).Collection(ms.cfg.Collection)
+
+	filter := bson.M{ms.cfg.Uid: uid}
+	err := col.FindOne(context.Background(), filter).Decode(&result)
+
+	return &result, err
+}
+
+func (ms *mongoStore[T]) List() ([]T, error) {
 	panic("not implemented")
 }
 
-func (ms *mongoStore) List() ([]any, error) {
+func (ms *mongoStore[T]) Save(data *T) error {
+	col := ms.client.Database(ms.cfg.DBName).Collection(ms.cfg.Collection)
+
+	_, err := col.InsertOne(context.Background(), &data)
+	return err
+}
+
+func (ms *mongoStore[T]) Delete(id string) error {
 	panic("not implemented")
 }
 
-func (ms *mongoStore) Save(K, data any) error {
-	panic("not implemented")
-}
+func (ms *mongoStore[T]) Update(uid string, data *T) error {
+	col := ms.client.Database(ms.cfg.DBName).Collection(ms.cfg.Collection)
 
-func (ms *mongoStore) Delete(id string) error {
-	panic("not implemented")
+	filter := bson.M{ms.cfg.Uid: uid}
+	_, err := col.ReplaceOne(context.Background(), filter, &data)
+	return err
 }

@@ -1,6 +1,6 @@
 package entity
 
 type Room struct {
-	RoomId  string    `json:"roomId" bson:"roomId"`
-	Members []*Member `json:"members" bson:"members"`
+	RoomId  string    `bson:"roomId"`
+	Members []*Member `bson:"members"`
 }

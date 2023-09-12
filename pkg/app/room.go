@@ -5,105 +5,77 @@ import (
 	"chat-app/pkg/entity"
 	model "chat-app/pkg/models"
 	"chat-app/pkg/utils"
-	"context"
-	"fmt"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type roomSvc struct {
-	// DB domain.Storage
+	db     *mongo.Client
+	config *db.Configuration
 }
 
-func NewRoomSvc() roomSvc {
-	// return roomSvc{DB: store}
-	return roomSvc{}
+func NewRoomSvc(client *mongo.Client, config *db.Configuration) roomSvc {
+	return roomSvc{db: client, config: config}
 }
 
-func getCollection(dbName, collectioName string) *mongo.Collection {
-	client := db.GetClient()
-	col := client.Database(dbName).Collection(collectioName)
-	return col
-}
-
-func (rs roomSvc) GetRoom(roomId string) (*model.Room, error) {
-
-	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
-	filter := bson.M{"roomId": roomId}
-
-	var result *entity.Room
-	err := col.FindOne(context.TODO(), filter).Decode(&result)
+func (rs *roomSvc) GetRoom(roomId string) (*model.Room, error) {
+	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
+	roomEntity, err := repo.Get(roomId)
 	if err != nil {
-		fmt.Println("Error while getting room", err)
 		return nil, err
 	}
-
-	room := utils.EntityToModelRoom(result)
-
+	room := utils.EntityToModelRoom(roomEntity)
 	return room, nil
 }
 
-func (rs roomSvc) CreateRoom() (*model.Room, error) {
-	// roomId := uuid.New().String()[:5]
-	roomId := "abcde"
+func (rs *roomSvc) CreateRoom() (*model.Room, error) {
+	roomId := generateRoomID()
 	room := &model.Room{RoomId: roomId, Members: []*model.Member{}}
 
-	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
-
+	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
 	roomEntity := utils.ModelToEntityRoom(room)
-	_, err := col.InsertOne(context.TODO(), roomEntity)
+	err := repo.Save(roomEntity)
 	if err != nil {
-		fmt.Println("Error while creating room", err)
 		return nil, err
 	}
-	return room, err
+	return room, nil
 }
 
-func (rs roomSvc) AddMember(room *model.Room, member *model.Member) {
+func (rs *roomSvc) AddMember(room *model.Room, member *model.Member) error {
 	room.Members = append(room.Members, member)
 
-	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
-	filter := bson.M{"roomId": room.RoomId}
-
+	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
 	roomEntity := utils.ModelToEntityRoom(room)
-	_, err := col.ReplaceOne(context.TODO(), filter, &roomEntity)
-	if err != nil {
-		fmt.Println("Error while adding member to the room", err)
-	}
+	err := repo.Update(room.RoomId, roomEntity)
+	return err
 }
 
-func (rs roomSvc) RemoveMember(room *model.Room, username string) error {
-	// room.Lock()
-	// defer room.Unlock()
-
+func (rs *roomSvc) RemoveMember(room *model.Room, username string) error {
 	for i, member := range room.Members {
 		if member.Username == username {
 			room.Members = utils.RemoveIndex(room.Members, i)
 			// update db
-			col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_ROOM)
-			filter := bson.M{"roomId": room.RoomId}
-
 			roomEntity := utils.ModelToEntityRoom(room)
-
-			_, err := col.ReplaceOne(context.TODO(), filter, &roomEntity)
-			if err != nil {
-				fmt.Println("Error while removing member", err)
-				return err
-			}
-
-			break
+			repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
+			err := repo.Update(room.RoomId, roomEntity)
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (rs roomSvc) IsNewMember(room *model.Room, memberUsername string) bool {
+func (rs *roomSvc) IsNewMember(room *model.Room, username string) bool {
 	for _, member := range room.Members {
-		if member.Username == memberUsername {
+		if member.Username == username {
 			return false
 		}
 	}
 	return true
+}
+
+// helper
+func generateRoomID() string {
+	return uuid.New().String()[:5]
 }

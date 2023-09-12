@@ -8,11 +8,11 @@ import (
 )
 
 func init() {
-	// loan env or crash
-	err := godotenv.Load("../.env")
-	utils.HandleError(err, "error while loading env")
+	err := godotenv.Load(".env")
+	utils.FatalError(err, "error while loading .env")
 }
 
 func main() {
-	ihttp.Start()
+	server := ihttp.NewServer()
+	server.Start()
 }

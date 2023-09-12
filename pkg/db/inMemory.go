@@ -16,23 +16,23 @@ var singleInMemInstance *inMemoryStorage
 // singleton
 func newInMemoryStore() types.Storage {
 	if singleInMemInstance == nil {
-		singleInMemInstance = &inMemoryStorage{items: new(sync.Map)}
+		singleInMemInstance = &inMemoryStorage{items: &sync.Map{}}
 	}
 	return singleInMemInstance
 }
 
 func (s *inMemoryStorage) Get(K string) (any, error) {
-	value, ok := s.items.Load(K)
+	v, ok := s.items.Load(K)
 	if ok {
-		return value, nil
+		return v, nil
 	}
 	return nil, errors.Errorf("no data found with key: %v", K)
 }
 
 func (s *inMemoryStorage) List() ([]any, error) {
-	var values []any
-	s.items.Range(func(key, value interface{}) bool {
-		values = append(values, value)
+	var values = []any{}
+	s.items.Range(func(k, v any) bool {
+		values = append(values, v)
 		return true
 	})
 	return values, nil

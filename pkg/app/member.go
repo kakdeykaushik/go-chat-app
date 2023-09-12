@@ -1,66 +1,63 @@
 package app
 
 import (
+	"chat-app/pkg/db"
 	"chat-app/pkg/entity"
 	model "chat-app/pkg/models"
 	"chat-app/pkg/utils"
-	"context"
-	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type memberSvc struct {
-	// DB domain.Storage
+	db     *mongo.Client
+	config *db.Configuration
 }
 
-func NewMemberSvc() memberSvc {
-	// return memberSvc{DB: store}
-	return memberSvc{}
+func NewMemberSvc(client *mongo.Client, config *db.Configuration) memberSvc {
+	return memberSvc{db: client, config: config}
 }
 
-func (ms memberSvc) CreateMember(username string, socket *websocket.Conn) *model.Member {
+func (ms *memberSvc) CreateMember(username string, socket *websocket.Conn) (*model.Member, error) {
 
 	m, err := ms.GetMember(username)
+	// error - member does not exists
 	if err == mongo.ErrNoDocuments {
 
 		conn := model.Connection{Socket: socket, Mutex: &sync.Mutex{}}
 		member := &model.Member{Username: username, Conn: &conn}
 
-		col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_MEMBER)
 		memberEntity := utils.ModelToEntityMember(member)
-		_, err := col.InsertOne(context.TODO(), memberEntity)
+
+		repo := db.NewMongoStore[entity.Member](ms.db, ms.config)
+		err := repo.Save(memberEntity)
 
 		if err != nil {
-			fmt.Println("Error while creating member", err)
-			return nil
+			return nil, err
 		}
-		return member
+		return member, err
 	}
 
+	// error - some other error
 	if err != nil {
-		fmt.Println("Error creating member", err)
-		return nil
+		return nil, err
 	}
 
-	return m
+	// everything ok
+	return m, nil
 }
 
-func (ms memberSvc) GetMember(username string) (*model.Member, error) {
-	col := getCollection(utils.DB_CHATROOM, utils.COLLECTION_MEMBER)
+func (ms *memberSvc) GetMember(username string) (*model.Member, error) {
+	repo := db.NewMongoStore[entity.Member](ms.db, ms.config)
+	memberEntity, err := repo.Get(username)
 
-	var memberEntity *entity.Member
-
-	filter := bson.M{"username": username}
-	err := col.FindOne(context.Background(), filter).Decode(&memberEntity)
-
-	if err == mongo.ErrNoDocuments {
+	if err != nil {
 		return nil, err
 	}
 
 	member := utils.EntityToModelMember(memberEntity)
-	return member, err
+
+	return member, nil
 }

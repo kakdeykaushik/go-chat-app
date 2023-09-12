@@ -28,5 +28,5 @@ type ChatMessageSend struct {
 
 type ChatMessageReceive struct {
 	Message string `json:"message"`
-	// SentAt  time.Time
+	// SentAt  time.Time // todo
 }
