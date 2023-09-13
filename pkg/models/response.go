@@ -27,7 +27,15 @@ type ChatMessageSend struct {
 	RoomId      string `json:"roomId"`
 }
 
+type Receiver struct {
+	Channel string `json:"channel"`
+	Uid     string `json:"uid"`
+}
+
 type ChatMessageReceive struct {
-	Message string `json:"message"`
+	Message string   `json:"message"`
+	SendTo  Receiver `json:"sendTo"`
 	// SentAt  time.Time // todo
 }
+
+// todo - implement "UnmarshalJSON" to restrict Channel to 2 types

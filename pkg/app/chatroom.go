@@ -8,20 +8,22 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
 var (
 	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
-		username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
-		return !(username == "" || roomId == "")
+		username := r.URL.Query().Get("email")
+		return strings.Contains(username, ".com")
 	}}
 )
 
+// todo; move liveMemberConn and roomToMember to thier services and think how to reduce DB calls
 type ChatApp struct {
-	liveMemberConn types.Storage
-	roomToMember   types.Storage
+	liveMemberConn types.Storage // stores K:V as username : ws 			 - same below this can moved to memberService
+	roomToMember   types.Storage // stores K:V as roomId   : []*model.Member - caching this should be responsibility of room service
 	memberService  memberSvc
 	roomService    roomSvc
 }
@@ -130,6 +132,30 @@ func (c *ChatApp) NewRoom(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&resp)
 }
 
+func (c *ChatApp) JoinRoom(w http.ResponseWriter, r *http.Request) {
+	username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
+
+	myRoom, err := c.roomService.GetRoom(roomId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	member, err := c.memberService.GetMember(username)
+	if err != nil {
+		return
+	}
+	err = c.roomService.AddMember(myRoom, member)
+	if err != nil {
+		return
+	}
+	data := &model.MessageBody{Message: "user added to the room"}
+
+	resp := utils.StatusOK(data)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(&resp)
+}
+
 func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	// Upgrade connection
 	socket, err := upgrader.Upgrade(w, r, w.Header())
@@ -142,46 +168,10 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	defer socket.Close()
 
-	username, roomId := r.URL.Query().Get("email"), r.URL.Query().Get("roomId")
-	fmt.Printf("Username, roomId: %v, %v\n", username, roomId)
+	username := r.URL.Query().Get("email")
+	c.liveMemberConn.Save(username, socket)
 
-	// Get room
-	myRoom, err := c.roomService.GetRoom(roomId)
-
-	if err != nil {
-		fmt.Println("room not found", err)
-		data := model.MessageBody{Message: "room not found"}
-
-		resp := utils.StatusOK(data)
-		socket.WriteJSON(resp)
-
-		return
-	}
-
-	// Check if current user is already in the room
-	if c.roomService.IsNewMember(myRoom, username) {
-		member, err := c.memberService.CreateMember(username, socket)
-		if err != nil {
-			fmt.Println("error while creating member", err)
-			return // internal server error
-		}
-
-		err = c.roomService.AddMember(myRoom, member)
-		if err != nil {
-			fmt.Println("error while adding member", err)
-			return // internal server error
-		}
-
-		// Update conn and inmem room data
-		c.liveMemberConn.Save(username, socket)
-		c.roomToMember.Save(roomId, myRoom.Members)
-
-		go c.sendMessage(username, myRoom, utils.MT_NEWUSER, fmt.Sprintf("%s joined.", username))
-	} else {
-		// Update conn and inmem room data
-		c.liveMemberConn.Save(username, socket)
-		c.roomToMember.Save(roomId, myRoom.Members)
-	}
+	fmt.Println("Username: ", username)
 
 	var message model.ChatMessageReceive
 
@@ -189,16 +179,11 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	for {
 		err := socket.ReadJSON(&message)
 
+		fmt.Println("message: ", message)
+
 		if websocket.IsCloseError(err, websocket.CloseGoingAway) {
 			// Remove member
 			c.liveMemberConn.Delete(username)
-			return
-		}
-
-		// Rare edge case
-		_, err = c.liveMemberConn.Get(username)
-		if err != nil {
-			fmt.Println("Member not available")
 			return
 		}
 
@@ -206,7 +191,42 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Failed to read message", err)
 			continue
 		}
-		go c.sendMessage(username, myRoom, utils.MT_MESSAGE, message.Message)
+
+		if message.SendTo.Channel == utils.CHANNEL_ROOM {
+			roomId := message.SendTo.Uid
+			myRoom, err := c.roomService.GetRoom(roomId)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			if c.roomService.IsNewMember(myRoom, username) {
+				return
+			}
+
+			// since he is existing, I'm assuming data will be present
+			// in roomToMember and its someone else's responsibility to take
+			// care of that
+
+			go c.sendMessage(username, myRoom, utils.MT_MESSAGE, message.Message)
+		}
+
+		if message.SendTo.Channel == utils.CHANNEL_INDIVIDUAL {
+			usernameReceiver := message.SendTo.Uid
+
+			receiver, err := c.memberService.GetMember(usernameReceiver)
+
+			if err != nil {
+				continue
+			}
+			me, err := c.memberService.GetMember(username)
+			if err != nil {
+				continue
+			}
+
+			go c.sendMessage(username, me, utils.MT_MESSAGE, message.Message)
+			go c.sendMessage(username, receiver, utils.MT_MESSAGE, message.Message)
+		}
+
 	}
 }
 
@@ -214,19 +234,8 @@ func (c *ChatApp) sendMessage(sender string, rec any, messageType string, messag
 	switch receiver := rec.(type) {
 
 	case *model.Room:
-		rm, err := c.roomToMember.Get(receiver.RoomId)
-		if err != nil {
-			fmt.Println("Unable to get members")
-			return
-		}
-
-		members, ok := rm.([]*model.Member)
-		if !ok {
-			fmt.Println("not parsed to []*model.Member")
-			return
-		}
-
-		for _, member := range members {
+		r, _ := c.roomService.GetRoom(receiver.RoomId)
+		for _, member := range r.Members {
 			go c.send(messageType, sender, message, member, receiver.RoomId)
 		}
 

@@ -29,12 +29,16 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	chatApp := getChatApp()
 
+	// todo: add HTTP methods as well, use r.Method()
+
 	switch r.URL.Path {
 
 	case "/", "/home":
 		chatApp.Home(w, r)
 	case "/room/new":
 		chatApp.NewRoom(w, r)
+	case "/room/join":
+		chatApp.JoinRoom(w, r)
 	case "/room/view":
 		chatApp.ViewRoom(w, r)
 	case "/room/leave":

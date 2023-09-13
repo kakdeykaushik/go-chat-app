@@ -1,10 +1,20 @@
 <html>
   <div>
     <input id="email" type="email" size="40" />
-    <input id="roomId" type="text" size="40" value="abcde" />
     <button onclick="connect()">Connect</button>
     <pre id="socket-connection"></pre>
 
+    <label> <input type="radio" name="channel" value="room" /> Room </label>
+    <br />
+    <label> <input type="radio" name="channel" value="individual" /> Individual </label>
+    <br />
+
+    UID: <input id="uid" type="text" size="40" />
+
+
+    <br />
+
+    message
     <input id="input" type="text" size="40" />
     <button onclick="send()">Send</button>
     <pre id="output"></pre>
@@ -30,13 +40,11 @@
 
     function connect() {
       const email = document.getElementById("email").value;
-      const roomId = document.getElementById("roomId").value;
-      socket = new WebSocket(
-        `ws://localhost:8000/room/?email=${email}&roomId=${roomId}`
-      );
+      socket = new WebSocket(`ws://localhost:8000/room/?email=${email}`);
 
       socket.onopen = function () {
-        output.innerHTML += `Connected ${email}\n`; // improvement
+        output.innerHTML += `Connected ${email}\n`;
+        // todo;improvement
       };
 
       socket.onmessage = function (e) {
@@ -63,7 +71,18 @@
         return;
       }
 
-      data = { message: input.value };
+      const selectedRadioButton = document.querySelector('input[name="channel"]:checked');
+
+      var uidValue = document.getElementById("uid").value;
+
+      data = {
+        message: input.value,
+        sendTo: {
+          channel: selectedRadioButton.value, // "room" or "individual"
+          uid: uidValue,
+        },
+      };
+
       socket.send(JSON.stringify(data));
       input.value = "";
     }

@@ -24,7 +24,7 @@ func GetClient() (*mongo.Client, error) {
 
 	uri := os.Getenv("mongo_uri")
 
-	c, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
+	c, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
 	singleMongoClient = c
 	return singleMongoClient, err
 }

@@ -16,5 +16,6 @@ type Member struct {
 	Conn     *Connection
 }
 
-// todo ; add NewMember fn
-// todo ; add NewX fn for almost all struct
+// todo ;
+// 1. add NewMember fn
+// 2. add NewX fn for almost all struct
