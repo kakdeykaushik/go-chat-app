@@ -20,10 +20,9 @@ var (
 	}}
 )
 
-// todo; move liveMemberConn and roomToMember to thier services and think how to reduce DB calls
+// todo; move liveMemberConn to memberService and think how to reduce DB calls
 type ChatApp struct {
 	liveMemberConn types.Storage // stores K:V as username : ws 			 - same below this can moved to memberService
-	roomToMember   types.Storage // stores K:V as roomId   : []*model.Member - caching this should be responsibility of room service
 	memberService  memberSvc
 	roomService    roomSvc
 }
@@ -31,15 +30,14 @@ type ChatApp struct {
 /*
 this should have its own
 - liveMemberConn
-- roomToMember
 - and rest as usual
   - db client
   - configs (for below services)
   - member service
   - room service
 */
-func NewChatApp(liveMemberConn types.Storage, roomToMember types.Storage, memberService memberSvc, roomService roomSvc) *ChatApp {
-	return &ChatApp{liveMemberConn: liveMemberConn, roomToMember: roomToMember, memberService: memberService, roomService: roomService}
+func NewChatApp(liveMemberConn types.Storage, memberService memberSvc, roomService roomSvc) *ChatApp {
+	return &ChatApp{liveMemberConn: liveMemberConn, memberService: memberService, roomService: roomService}
 }
 
 func (c *ChatApp) Home(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +72,6 @@ func (c *ChatApp) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 	// remove from DB and update in mem
 	c.roomService.RemoveMember(room, username)
 	c.liveMemberConn.Delete(username)
-	c.roomToMember.Save(roomId, room.Members)
 
 	message := fmt.Sprintf("%v left the room", username)
 	go c.sendMessage("admin", room, utils.MT_LEAVE, message)
@@ -202,10 +199,6 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 			if c.roomService.IsNewMember(myRoom, username) {
 				return
 			}
-
-			// since he is existing, I'm assuming data will be present
-			// in roomToMember and its someone else's responsibility to take
-			// care of that
 
 			go c.sendMessage(username, myRoom, utils.MT_MESSAGE, message.Message)
 		}

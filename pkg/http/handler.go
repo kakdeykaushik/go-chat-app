@@ -30,6 +30,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	chatApp := getChatApp()
 
 	// todo: add HTTP methods as well, use r.Method()
+	// todo: add more feature APIs like create member etc. Think about it
 
 	switch r.URL.Path {
 
@@ -53,7 +54,6 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // helper
 func getChatApp() *app.ChatApp {
 	liveMemberConn := db.NewDB(utils.STORE_MEMORY)
-	roomToMember := db.NewDB(utils.STORE_MEMORY)
 
 	// use db.NewDB to get mongo store? - probably NO bcz here i dont want to provide entity T
 	dbClient, err := db.GetClient()
@@ -65,7 +65,7 @@ func getChatApp() *app.ChatApp {
 	memberSvc := app.NewMemberSvc(dbClient, memberDBConfig)
 	roomSvc := app.NewRoomSvc(dbClient, roomDBConfig)
 
-	return app.NewChatApp(liveMemberConn, roomToMember, memberSvc, roomSvc)
+	return app.NewChatApp(liveMemberConn, memberSvc, roomSvc)
 
 }
 
