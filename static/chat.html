@@ -45,11 +45,12 @@
         const messageType = data.messageType;
         const sender = data.sender;
         const message = data.message;
+        const roomId = data.roomId;
 
         if (messageType === "new user") {
-          val = `[INFO]: ${message}\n`;
+          val = `[INFO] @ ${roomId}: ${message}\n`;
         } else {
-          val = `${sender}: ${message}\n`;
+          val = `${sender.slice(0, 8)} @ ${roomId}: ${message}\n`;
         }
 
         output.innerHTML += val;

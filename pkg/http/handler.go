@@ -6,11 +6,10 @@ import (
 	"chat-app/pkg/utils"
 	"fmt"
 	"log"
+	"os"
 
 	"net/http"
 )
-
-//  todo - this is actuall handler - rename to handler.go
 
 type server struct{}
 
@@ -20,8 +19,9 @@ func NewServer() *server {
 
 // spins up server
 func (s *server) Start() {
+	port := getPort()
 	fmt.Println("Server is running...")
-	log.Fatalln(http.ListenAndServe(":8000", s))
+	log.Fatalln(http.ListenAndServe(port, s))
 }
 
 // ServeHTTP to implement http.Handler interface
@@ -31,7 +31,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch r.URL.Path {
 
-	case "/":
+	case "/", "/home":
 		chatApp.Home(w, r)
 	case "/room/new":
 		chatApp.NewRoom(w, r)
@@ -63,4 +63,13 @@ func getChatApp() *app.ChatApp {
 
 	return app.NewChatApp(liveMemberConn, roomToMember, memberSvc, roomSvc)
 
+}
+
+// helper
+func getPort() string {
+	port := os.Getenv("port")
+	if port == "" {
+		port = ":8000"
+	}
+	return port
 }

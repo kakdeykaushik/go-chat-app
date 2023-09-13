@@ -24,6 +24,7 @@ type ChatMessageSend struct {
 	MessageType string `json:"messageType"`
 	Sender      string `json:"sender"`
 	Message     string `json:"message"`
+	RoomId      string `json:"roomId"`
 }
 
 type ChatMessageReceive struct {

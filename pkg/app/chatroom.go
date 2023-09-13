@@ -227,18 +227,18 @@ func (c *ChatApp) sendMessage(sender string, rec any, messageType string, messag
 		}
 
 		for _, member := range members {
-			go c.send(messageType, sender, message, member)
+			go c.send(messageType, sender, message, member, receiver.RoomId)
 		}
 
 	case *model.Member:
-		go c.send(messageType, sender, message, receiver)
+		go c.send(messageType, sender, message, receiver, receiver.Username)
 
 	default:
 		fmt.Println("invalid receiver")
 	}
 }
 
-func (c *ChatApp) send(messageType string, sender string, message string, receiver *model.Member) {
+func (c *ChatApp) send(messageType string, sender string, message string, receiver *model.Member, roomId string) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered. Error:\n", r)
@@ -258,9 +258,16 @@ func (c *ChatApp) send(messageType string, sender string, message string, receiv
 	}
 
 	fmt.Printf("Sending message to: %v - %s\n", receiver.Username, message)
-	msg := model.ChatMessageSend{MessageType: messageType, Sender: sender, Message: message}
+	msg := model.ChatMessageSend{MessageType: messageType, Sender: sender, Message: message, RoomId: roomId}
 	err = sock.WriteJSON(msg)
 	if err != nil {
 		fmt.Println("Failed to Write message", err)
 	}
 }
+
+/*
+to pivot app from "room" to "room(s) and DM(s)"
+URL check for roomId should be dropped and some kind of Auth can be implemented
+
+then - on .ReadJSON data should contain to whom message should be sent to room(roomId) or DM(username)
+*/
