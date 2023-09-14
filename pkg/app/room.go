@@ -42,8 +42,12 @@ func (rs *roomSvc) CreateRoom() (*model.Room, error) {
 	return room, nil
 }
 
-// todo; do dedup before adding
 func (rs *roomSvc) AddMember(room *model.Room, member *model.Member) error {
+
+	if !rs.IsNewMember(room, member.Username) {
+		return nil
+	}
+
 	room.Members = append(room.Members, member)
 
 	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
