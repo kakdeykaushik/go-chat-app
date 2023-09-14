@@ -7,7 +7,6 @@ import (
 	"chat-app/pkg/types"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,8 +28,7 @@ func (ms *memberSvc) CreateMember(username string, socket *websocket.Conn) (*mod
 	// error - member does not exists
 	if err == mongo.ErrNoDocuments {
 
-		conn := model.Connection{Socket: socket, Mutex: &sync.Mutex{}}
-		member := &model.Member{Username: username, Conn: &conn}
+		member := model.NewMember(username, socket)
 
 		memberEntity := model.ModelToEntityMember(member)
 

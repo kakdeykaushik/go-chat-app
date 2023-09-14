@@ -31,7 +31,7 @@ func (rs *roomSvc) GetRoom(roomId string) (*model.Room, error) {
 
 func (rs *roomSvc) CreateRoom() (*model.Room, error) {
 	roomId := generateRoomID()
-	room := &model.Room{RoomId: roomId, Members: []*model.Member{}}
+	room := model.NewRoom(roomId, []*model.Member{})
 
 	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
 	roomEntity := model.ModelToEntityRoom(room)

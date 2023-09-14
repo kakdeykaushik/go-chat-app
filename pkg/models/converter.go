@@ -2,7 +2,6 @@ package model
 
 import (
 	"chat-app/pkg/entity"
-	"sync"
 )
 
 func ModelToEntityMember(m *Member) *entity.Member {
@@ -13,14 +12,7 @@ func ModelToEntityMember(m *Member) *entity.Member {
 }
 
 func EntityToModelMember(e *entity.Member) *Member {
-	var m = &Member{}
-
-	m.Username = e.Username
-	m.Conn = &Connection{}
-	m.Conn.Mutex = &sync.Mutex{}
-	m.Conn.Socket = nil
-
-	return m
+	return NewMember(e.Username, nil)
 }
 
 func ModelToEntityRoom(r *Room) *entity.Room {
@@ -45,10 +37,6 @@ func EntityToModelRoom(e *entity.Room) *Room {
 		members = append(members, modelMember)
 	}
 
-	var m = &Room{}
-	m.RoomId = e.RoomId
-	m.Members = members
-
-	return m
+	return NewRoom(e.RoomId, members)
 
 }

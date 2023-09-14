@@ -53,7 +53,7 @@ func (c *ChatApp) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 
 	room, err := c.roomService.GetRoom(roomId)
 	if err != nil {
-		data := model.MessageBody{Message: "room does not exist"}
+		data := model.NewMessageBody("room does not exist")
 
 		resp := model.StatusOK(data)
 		w.WriteHeader(http.StatusOK)
@@ -68,7 +68,7 @@ func (c *ChatApp) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 	message := fmt.Sprintf("%v left the room", username)
 	go c.sendMessage("admin", room, utils.MT_LEAVE, message)
 
-	data := model.MessageBody{Message: "room left successfully"}
+	data := model.NewMessageBody("room left successfully")
 
 	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
@@ -81,7 +81,7 @@ func (c *ChatApp) ViewRoom(w http.ResponseWriter, r *http.Request) {
 
 	room, err := c.roomService.GetRoom(roomId)
 	if err != nil {
-		var data = model.MessageBody{Message: "Unable to get room"}
+		data := model.NewMessageBody("Unable to get room")
 
 		resp := model.StatusOK(data)
 		w.WriteHeader(http.StatusOK)
@@ -95,7 +95,7 @@ func (c *ChatApp) ViewRoom(w http.ResponseWriter, r *http.Request) {
 		members = append(members, member.Username)
 	}
 
-	var data = model.RoomDataBody{RoomId: roomId, Member: members}
+	data := model.NewRoomDataBody(roomId, members)
 
 	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
@@ -107,14 +107,14 @@ func (c *ChatApp) NewRoom(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println("Error while creating new room", err)
-		data := model.MessageBody{Message: "unable to create room. please try again later"}
+		data := model.NewMessageBody("unable to create room. please try again later")
 		resp := model.StatusOK(data)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(&resp)
 		return
 	}
 
-	data := model.NewRoomBody{RoomId: room.RoomId}
+	data := model.NewNewRoomBody(room.RoomId)
 
 	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
@@ -138,7 +138,7 @@ func (c *ChatApp) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	data := &model.MessageBody{Message: "user added to the room"}
+	data := model.NewMessageBody("user added to the room")
 
 	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
@@ -254,7 +254,7 @@ func (c *ChatApp) send(messageType string, sender string, message string, receiv
 	}
 
 	fmt.Printf("Sending message to: %v - %s\n", receiver.Username, message)
-	msg := model.ChatMessageSend{MessageType: messageType, Sender: sender, Message: message, RoomId: roomId}
+	msg := model.NewChatMessageSend(messageType, sender, message, roomId)
 	err = sock.WriteJSON(msg)
 	if err != nil {
 		fmt.Println("Failed to Write message", err)

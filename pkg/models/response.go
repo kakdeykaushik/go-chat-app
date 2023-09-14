@@ -7,41 +7,57 @@ import (
 	"net/http"
 )
 
-type ResponseModel struct {
+type responseModel struct {
 	Status  int    `json:"status"`
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Data    any    `json:"data"`
 }
 
-type MessageBody struct {
+type messageBody struct {
 	Message string `json:"message"`
 }
 
-type RoomDataBody struct {
+func NewMessageBody(msg string) *messageBody {
+	return &messageBody{Message: msg}
+}
+
+type roomDataBody struct {
 	RoomId string   `json:"roomId"`
 	Member []string `json:"member"`
 }
 
-type NewRoomBody struct {
+func NewRoomDataBody(roomId string, members []string) *roomDataBody {
+	return &roomDataBody{RoomId: roomId, Member: members}
+}
+
+type newRoomBody struct {
 	RoomId string `json:"roomId"`
 }
 
-type ChatMessageSend struct {
+func NewNewRoomBody(roomId string) *newRoomBody {
+	return &newRoomBody{RoomId: roomId}
+}
+
+type chatMessageSend struct {
 	MessageType string `json:"messageType"`
 	Sender      string `json:"sender"`
 	Message     string `json:"message"`
 	RoomId      string `json:"roomId"`
 }
 
-type Receiver struct {
+func NewChatMessageSend(messageType, sender, message, roomId string) *chatMessageSend {
+	return &chatMessageSend{MessageType: messageType, Sender: sender, Message: message, RoomId: roomId}
+}
+
+type receiver struct {
 	Channel string `json:"channel"`
 	Uid     string `json:"uid"`
 }
 
 type ChatMessageReceive struct {
 	Message string   `json:"message"`
-	SendTo  Receiver `json:"sendTo"`
+	SendTo  receiver `json:"sendTo"`
 	// SentAt  time.Time // todo
 }
 
@@ -61,8 +77,9 @@ func (cmr *ChatMessageReceive) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func NewResponse(status int, data any, message string, success bool) ResponseModel {
-	return ResponseModel{
+// responses
+func NewResponse(status int, data any, message string, success bool) responseModel {
+	return responseModel{
 		Status:  status,
 		Data:    data,
 		Message: message,
@@ -70,8 +87,8 @@ func NewResponse(status int, data any, message string, success bool) ResponseMod
 	}
 }
 
-func StatusOK(data any) ResponseModel {
-	return ResponseModel{
+func StatusOK(data any) responseModel {
+	return responseModel{
 		Status:  http.StatusOK,
 		Data:    data,
 		Message: "OK",
@@ -79,16 +96,16 @@ func StatusOK(data any) ResponseModel {
 	}
 }
 
-func StatusInternalServerError() ResponseModel {
-	return ResponseModel{
+func StatusInternalServerError() responseModel {
+	return responseModel{
 		Status:  http.StatusInternalServerError,
 		Message: "Unhandled error occurred. Please try again later",
 		Success: false,
 	}
 }
 
-func StatusBadRequest(message string) ResponseModel {
-	return ResponseModel{
+func StatusBadRequest(message string) responseModel {
+	return responseModel{
 		Status:  http.StatusBadRequest,
 		Message: message,
 		Success: false,

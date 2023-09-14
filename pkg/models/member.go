@@ -6,16 +6,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Connection struct {
+type connection struct {
 	Socket *websocket.Conn
 	*sync.Mutex
 }
 
 type Member struct {
 	Username string
-	Conn     *Connection
+	Conn     *connection
 }
 
-// todo ;
-// 1. add NewMember fn
-// 2. add NewX fn for almost all struct
+func NewMember(username string, socket *websocket.Conn) *Member {
+	conn := &connection{Socket: socket, Mutex: &sync.Mutex{}}
+	return &Member{Username: username, Conn: conn}
+}
