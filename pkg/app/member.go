@@ -4,7 +4,6 @@ import (
 	"chat-app/pkg/db"
 	"chat-app/pkg/entity"
 	model "chat-app/pkg/models"
-	"chat-app/pkg/utils"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -29,7 +28,7 @@ func (ms *memberSvc) CreateMember(username string, socket *websocket.Conn) (*mod
 		conn := model.Connection{Socket: socket, Mutex: &sync.Mutex{}}
 		member := &model.Member{Username: username, Conn: &conn}
 
-		memberEntity := utils.ModelToEntityMember(member)
+		memberEntity := model.ModelToEntityMember(member)
 
 		repo := db.NewMongoStore[entity.Member](ms.db, ms.config)
 		err := repo.Save(memberEntity)
@@ -57,7 +56,7 @@ func (ms *memberSvc) GetMember(username string) (*model.Member, error) {
 		return nil, err
 	}
 
-	member := utils.EntityToModelMember(memberEntity)
+	member := model.EntityToModelMember(memberEntity)
 
 	return member, nil
 }

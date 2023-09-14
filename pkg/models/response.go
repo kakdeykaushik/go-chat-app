@@ -1,5 +1,12 @@
 package model
 
+import (
+	"chat-app/pkg/utils"
+	"encoding/json"
+	"errors"
+	"net/http"
+)
+
 type ResponseModel struct {
 	Status  int    `json:"status"`
 	Success bool   `json:"success"`
@@ -38,4 +45,51 @@ type ChatMessageReceive struct {
 	// SentAt  time.Time // todo
 }
 
-// todo - implement "UnmarshalJSON" to restrict Channel to 2 types
+func (cmr *ChatMessageReceive) UnmarshalJSON(data []byte) error {
+	var chatMsg ChatMessageReceive
+
+	if err := json.Unmarshal(data, &chatMsg); err != nil {
+		return err
+	}
+
+	if chatMsg.SendTo.Channel != utils.CHANNEL_ROOM && chatMsg.SendTo.Channel != utils.CHANNEL_INDIVIDUAL {
+		return errors.New("channel must be 'room' or 'individual'")
+	}
+
+	*cmr = ChatMessageReceive(chatMsg)
+	return nil
+}
+
+func NewResponse(status int, data any, message string, success bool) ResponseModel {
+	return ResponseModel{
+		Status:  status,
+		Data:    data,
+		Message: message,
+		Success: success,
+	}
+}
+
+func StatusOK(data any) ResponseModel {
+	return ResponseModel{
+		Status:  http.StatusOK,
+		Data:    data,
+		Message: "OK",
+		Success: true,
+	}
+}
+
+func StatusInternalServerError() ResponseModel {
+	return ResponseModel{
+		Status:  http.StatusInternalServerError,
+		Message: "Unhandled error occurred. Please try again later",
+		Success: false,
+	}
+}
+
+func StatusBadRequest(message string) ResponseModel {
+	return ResponseModel{
+		Status:  http.StatusBadRequest,
+		Message: message,
+		Success: false,
+	}
+}

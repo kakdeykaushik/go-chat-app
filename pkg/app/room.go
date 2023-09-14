@@ -25,7 +25,7 @@ func (rs *roomSvc) GetRoom(roomId string) (*model.Room, error) {
 	if err != nil {
 		return nil, err
 	}
-	room := utils.EntityToModelRoom(roomEntity)
+	room := model.EntityToModelRoom(roomEntity)
 	return room, nil
 }
 
@@ -34,7 +34,7 @@ func (rs *roomSvc) CreateRoom() (*model.Room, error) {
 	room := &model.Room{RoomId: roomId, Members: []*model.Member{}}
 
 	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
-	roomEntity := utils.ModelToEntityRoom(room)
+	roomEntity := model.ModelToEntityRoom(room)
 	err := repo.Save(roomEntity)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (rs *roomSvc) AddMember(room *model.Room, member *model.Member) error {
 	room.Members = append(room.Members, member)
 
 	repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
-	roomEntity := utils.ModelToEntityRoom(room)
+	roomEntity := model.ModelToEntityRoom(room)
 	err := repo.Update(room.RoomId, roomEntity)
 	return err
 }
@@ -57,7 +57,7 @@ func (rs *roomSvc) RemoveMember(room *model.Room, username string) error {
 		if member.Username == username {
 			room.Members = utils.RemoveIndex(room.Members, i)
 			// update db
-			roomEntity := utils.ModelToEntityRoom(room)
+			roomEntity := model.ModelToEntityRoom(room)
 			repo := db.NewMongoStore[entity.Room](rs.db, rs.config)
 			err := repo.Update(room.RoomId, roomEntity)
 			return err

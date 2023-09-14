@@ -44,7 +44,7 @@ func (c *ChatApp) Home(w http.ResponseWriter, r *http.Request) {
 	content, err := os.ReadFile(utils.HOMEPAGE)
 	if err != nil {
 		fmt.Println(err)
-		resp := utils.StatusInternalServerError()
+		resp := model.StatusInternalServerError()
 
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&resp)
@@ -62,7 +62,7 @@ func (c *ChatApp) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		data := model.MessageBody{Message: "room does not exist"}
 
-		resp := utils.StatusOK(data)
+		resp := model.StatusOK(data)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(&resp)
 
@@ -78,7 +78,7 @@ func (c *ChatApp) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 
 	data := model.MessageBody{Message: "room left successfully"}
 
-	resp := utils.StatusOK(data)
+	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)
 
@@ -91,7 +91,7 @@ func (c *ChatApp) ViewRoom(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var data = model.MessageBody{Message: "Unable to get room"}
 
-		resp := utils.StatusOK(data)
+		resp := model.StatusOK(data)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(&resp)
 
@@ -105,7 +105,7 @@ func (c *ChatApp) ViewRoom(w http.ResponseWriter, r *http.Request) {
 
 	var data = model.RoomDataBody{RoomId: roomId, Member: members}
 
-	resp := utils.StatusOK(data)
+	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)
 }
@@ -116,7 +116,7 @@ func (c *ChatApp) NewRoom(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("Error while creating new room", err)
 		data := model.MessageBody{Message: "unable to create room. please try again later"}
-		resp := utils.StatusOK(data)
+		resp := model.StatusOK(data)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(&resp)
 		return
@@ -124,7 +124,7 @@ func (c *ChatApp) NewRoom(w http.ResponseWriter, r *http.Request) {
 
 	data := model.NewRoomBody{RoomId: room.RoomId}
 
-	resp := utils.StatusOK(data)
+	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)
 }
@@ -148,7 +148,7 @@ func (c *ChatApp) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	data := &model.MessageBody{Message: "user added to the room"}
 
-	resp := utils.StatusOK(data)
+	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)
 }
@@ -158,7 +158,7 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	socket, err := upgrader.Upgrade(w, r, w.Header())
 	if err != nil {
 		fmt.Println("Error while upgrading protocol: ", err)
-		resp := utils.StatusBadRequest("Unable to connect")
+		resp := model.StatusBadRequest("Unable to connect")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(&resp)
 		return
