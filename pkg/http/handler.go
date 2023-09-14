@@ -29,22 +29,22 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	chatApp := getChatApp()
 
-	// todo: add HTTP methods as well, use r.Method()
 	// todo: add more feature APIs like create member etc. Think about it
 
-	switch r.URL.Path {
+	// actual routes
 
-	case "/", "/home":
+	switch {
+	case r.URL.Path == "/", r.URL.Path == "/home" && r.Method == http.MethodGet:
 		chatApp.Home(w, r)
-	case "/room/new":
+	case r.URL.Path == "/room/new" && r.Method == http.MethodPost:
 		chatApp.NewRoom(w, r)
-	case "/room/join":
+	case r.URL.Path == "/room/join" && r.Method == http.MethodPost:
 		chatApp.JoinRoom(w, r)
-	case "/room/view":
+	case r.URL.Path == "/room/view" && r.Method == http.MethodGet:
 		chatApp.ViewRoom(w, r)
-	case "/room/leave":
+	case r.URL.Path == "/room/leave" && r.Method == http.MethodDelete:
 		chatApp.LeaveRoom(w, r)
-	case "/room/":
+	case r.URL.Path == "/room/" && r.Method == http.MethodPost:
 		chatApp.ChatRoom(w, r)
 	default:
 		http.NotFound(w, r)
