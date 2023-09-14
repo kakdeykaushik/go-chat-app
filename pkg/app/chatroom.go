@@ -2,7 +2,6 @@ package app
 
 import (
 	model "chat-app/pkg/models"
-	"chat-app/pkg/types"
 	"chat-app/pkg/utils"
 	"encoding/json"
 	"fmt"
@@ -20,24 +19,18 @@ var (
 	}}
 )
 
-// todo; move liveMemberConn to memberService and think how to reduce DB calls
 type ChatApp struct {
-	liveMemberConn types.Storage // stores K:V as username : ws 			 - same below this can moved to memberService
-	memberService  memberSvc
-	roomService    roomSvc
+	memberService memberSvc
+	roomService   roomSvc
 }
 
 /*
 this should have its own
-- liveMemberConn
-- and rest as usual
-  - db client
-  - configs (for below services)
   - member service
   - room service
 */
-func NewChatApp(liveMemberConn types.Storage, memberService memberSvc, roomService roomSvc) *ChatApp {
-	return &ChatApp{liveMemberConn: liveMemberConn, memberService: memberService, roomService: roomService}
+func NewChatApp(memberService memberSvc, roomService roomSvc) *ChatApp {
+	return &ChatApp{memberService: memberService, roomService: roomService}
 }
 
 func (c *ChatApp) Home(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +64,6 @@ func (c *ChatApp) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 
 	// remove from DB and update in mem
 	c.roomService.RemoveMember(room, username)
-	c.liveMemberConn.Delete(username)
 
 	message := fmt.Sprintf("%v left the room", username)
 	go c.sendMessage("admin", room, utils.MT_LEAVE, message)
@@ -166,7 +158,7 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	defer socket.Close()
 
 	username := r.URL.Query().Get("email")
-	c.liveMemberConn.Save(username, socket)
+	c.memberService.AddConn(username, socket)
 
 	fmt.Println("Username: ", username)
 
@@ -180,7 +172,10 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 
 		if websocket.IsCloseError(err, websocket.CloseGoingAway) {
 			// Remove member
-			c.liveMemberConn.Delete(username)
+			err := c.memberService.DeleteConn(username)
+			if err != nil {
+				fmt.Println(err)
+			}
 			return
 		}
 
@@ -216,6 +211,11 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			if me.Username == receiver.Username {
+				go c.sendMessage(username, me, utils.MT_MESSAGE, message.Message)
+				continue
+			}
+
 			go c.sendMessage(username, me, utils.MT_MESSAGE, message.Message)
 			go c.sendMessage(username, receiver, utils.MT_MESSAGE, message.Message)
 		}
@@ -247,15 +247,9 @@ func (c *ChatApp) send(messageType string, sender string, message string, receiv
 		}
 	}()
 
-	s, err := c.liveMemberConn.Get(receiver.Username)
+	sock, err := c.memberService.GetConn(receiver.Username)
 	if err != nil {
-		fmt.Printf("cannt send to %v\n", receiver.Username)
-		return
-	}
-
-	sock, ok := s.(*websocket.Conn)
-	if !ok {
-		fmt.Println(s, ok, "oeidfh")
+		fmt.Printf("cannt send to %v - %v\n", receiver.Username, err)
 		return
 	}
 

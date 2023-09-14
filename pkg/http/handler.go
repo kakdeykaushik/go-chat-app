@@ -62,10 +62,10 @@ func getChatApp() *app.ChatApp {
 	memberDBConfig := db.NewConfiguration(utils.DB_CHATROOM, utils.COLLECTION_MEMBER, "username")
 	roomDBConfig := db.NewConfiguration(utils.DB_CHATROOM, utils.COLLECTION_ROOM, "roomId")
 
-	memberSvc := app.NewMemberSvc(dbClient, memberDBConfig)
+	memberSvc := app.NewMemberSvc(dbClient, memberDBConfig, liveMemberConn)
 	roomSvc := app.NewRoomSvc(dbClient, roomDBConfig)
 
-	return app.NewChatApp(liveMemberConn, memberSvc, roomSvc)
+	return app.NewChatApp(memberSvc, roomSvc)
 
 }
 

@@ -46,7 +46,8 @@ type ChatMessageReceive struct {
 }
 
 func (cmr *ChatMessageReceive) UnmarshalJSON(data []byte) error {
-	var chatMsg ChatMessageReceive
+	type alias ChatMessageReceive // alias is important else it will go in inf loop
+	var chatMsg alias
 
 	if err := json.Unmarshal(data, &chatMsg); err != nil {
 		return err
