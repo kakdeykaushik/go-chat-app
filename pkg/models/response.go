@@ -66,7 +66,6 @@ type receiver struct {
 type ChatMessageReceive struct {
 	Message string   `json:"message"`
 	SendTo  receiver `json:"sendTo"`
-	// SentAt  time.Time // todo
 }
 
 func (cmr *ChatMessageReceive) UnmarshalJSON(data []byte) error {
