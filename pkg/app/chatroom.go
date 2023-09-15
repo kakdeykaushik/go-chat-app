@@ -177,11 +177,15 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 
 	username := r.URL.Query().Get("email")
 
-	// todo; check if username is valid member or not
+	fmt.Println("Username: ", username)
+
+	_, err = c.memberService.GetMember(username)
+	if err != nil {
+		fmt.Println("member not found")
+		return
+	}
 
 	c.memberService.AddConn(username, socket)
-
-	fmt.Println("Username: ", username)
 
 	var message model.ChatMessageReceive
 
