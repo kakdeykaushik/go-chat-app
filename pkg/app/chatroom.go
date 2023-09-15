@@ -176,6 +176,9 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	defer socket.Close()
 
 	username := r.URL.Query().Get("email")
+
+	// todo; check if username is valid member or not
+
 	c.memberService.AddConn(username, socket)
 
 	fmt.Println("Username: ", username)
@@ -185,11 +188,9 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 	// Read messages
 	for {
 		err := socket.ReadJSON(&message)
-
 		fmt.Println("message: ", message)
 
 		if websocket.IsCloseError(err, websocket.CloseGoingAway) {
-			// Remove member
 			err := c.memberService.DeleteConn(username)
 			if err != nil {
 				fmt.Println(err)
@@ -202,42 +203,49 @@ func (c *ChatApp) ChatRoom(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if message.SendTo.Channel == utils.CHANNEL_ROOM {
-			roomId := message.SendTo.Uid
-			myRoom, err := c.roomService.GetRoom(roomId)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-			if c.roomService.IsNewMember(myRoom, username) {
-				return
-			}
+		go c.verifyAndSend(username, message)
+	}
+}
 
-			go c.sendMessage(username, myRoom, utils.MT_MESSAGE, message.Message)
+// This will do some checks if message can be sent or not
+func (c *ChatApp) verifyAndSend(username string, message model.ChatMessageReceive) {
+
+	if message.SendTo.Channel == utils.CHANNEL_ROOM {
+		roomId := message.SendTo.Uid
+		myRoom, err := c.roomService.GetRoom(roomId)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if c.roomService.IsNewMember(myRoom, username) {
+			// not allowed to send in this room
+			return
 		}
 
-		if message.SendTo.Channel == utils.CHANNEL_INDIVIDUAL {
-			usernameReceiver := message.SendTo.Uid
+		c.sendMessage(username, myRoom, utils.MT_MESSAGE, message.Message)
+		return
+	}
 
-			receiver, err := c.memberService.GetMember(usernameReceiver)
+	if message.SendTo.Channel == utils.CHANNEL_INDIVIDUAL {
+		usernameReceiver := message.SendTo.Uid
 
-			if err != nil {
-				continue
-			}
-			me, err := c.memberService.GetMember(username)
-			if err != nil {
-				continue
-			}
-
-			if me.Username == receiver.Username {
-				go c.sendMessage(username, me, utils.MT_MESSAGE, message.Message)
-				continue
-			}
-
-			go c.sendMessage(username, me, utils.MT_MESSAGE, message.Message)
-			go c.sendMessage(username, receiver, utils.MT_MESSAGE, message.Message)
+		receiver, err := c.memberService.GetMember(usernameReceiver)
+		if err != nil {
+			return
 		}
 
+		if usernameReceiver == username {
+			c.sendMessage(username, receiver, utils.MT_MESSAGE, message.Message)
+			return
+		}
+
+		me, err := c.memberService.GetMember(username)
+		if err != nil {
+			return
+		}
+
+		c.sendMessage(username, me, utils.MT_MESSAGE, message.Message)
+		c.sendMessage(username, receiver, utils.MT_MESSAGE, message.Message)
 	}
 }
 
@@ -245,7 +253,10 @@ func (c *ChatApp) sendMessage(sender string, rec any, messageType string, messag
 	switch receiver := rec.(type) {
 
 	case *model.Room:
-		r, _ := c.roomService.GetRoom(receiver.RoomId)
+		r, err := c.roomService.GetRoom(receiver.RoomId)
+		if err != nil {
+			return
+		}
 		for _, member := range r.Members {
 			go c.send(messageType, sender, message, member, receiver.RoomId)
 		}
@@ -258,7 +269,7 @@ func (c *ChatApp) sendMessage(sender string, rec any, messageType string, messag
 	}
 }
 
-func (c *ChatApp) send(messageType string, sender string, message string, receiver *model.Member, roomId string) {
+func (c *ChatApp) send(messageType string, sender string, message string, receiver *model.Member, chatId string) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered. Error:\n", r)
@@ -272,16 +283,9 @@ func (c *ChatApp) send(messageType string, sender string, message string, receiv
 	}
 
 	fmt.Printf("Sending message to: %v - %s\n", receiver.Username, message)
-	msg := model.NewChatMessageSend(messageType, sender, message, roomId)
+	msg := model.NewChatMessageSend(messageType, sender, message, chatId)
 	err = sock.WriteJSON(msg)
 	if err != nil {
 		fmt.Println("Failed to Write message", err)
 	}
 }
-
-/*
-to pivot app from "room" to "room(s) and DM(s)"
-URL check for roomId should be dropped and some kind of Auth can be implemented
-
-then - on .ReadJSON data should contain to whom message should be sent to room(roomId) or DM(username)
-*/

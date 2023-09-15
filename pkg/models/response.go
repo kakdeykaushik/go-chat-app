@@ -51,11 +51,11 @@ type chatMessageSend struct {
 	MessageType string `json:"messageType"`
 	Sender      string `json:"sender"`
 	Message     string `json:"message"`
-	RoomId      string `json:"roomId"`
+	ChatId      string `json:"chatId"`
 }
 
-func NewChatMessageSend(messageType, sender, message, roomId string) *chatMessageSend {
-	return &chatMessageSend{MessageType: messageType, Sender: sender, Message: message, RoomId: roomId}
+func NewChatMessageSend(messageType, sender, message, chatId string) *chatMessageSend {
+	return &chatMessageSend{MessageType: messageType, Sender: sender, Message: message, ChatId: chatId}
 }
 
 type receiver struct {
