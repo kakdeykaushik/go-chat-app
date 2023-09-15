@@ -39,6 +39,14 @@ func NewNewRoomBody(roomId string) *newRoomBody {
 	return &newRoomBody{RoomId: roomId}
 }
 
+type newMemberBody struct {
+	Username string `json:"username"`
+}
+
+func NewNewMemberBody(username string) *newMemberBody {
+	return &newMemberBody{Username: username}
+}
+
 type chatMessageSend struct {
 	MessageType string `json:"messageType"`
 	Sender      string `json:"sender"`

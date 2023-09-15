@@ -109,7 +109,6 @@ func (c *ChatApp) NewRoom(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error while creating new room", err)
 		data := model.NewMessageBody("unable to create room. please try again later")
 		resp := model.StatusOK(data)
-		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(&resp)
 		return
 	}
@@ -140,6 +139,25 @@ func (c *ChatApp) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	data := model.NewMessageBody("user added to the room")
 
+	resp := model.StatusOK(data)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(&resp)
+}
+
+func (c *ChatApp) NewMember(w http.ResponseWriter, r *http.Request) {
+	username := r.URL.Query().Get("username")
+
+	member, err := c.memberService.CreateMember(username)
+
+	if err != nil {
+		fmt.Println("Error while creating new member", err)
+		data := model.NewMessageBody("unable to create member. please try again later")
+		resp := model.StatusOK(data)
+		json.NewEncoder(w).Encode(&resp)
+		return
+	}
+
+	data := model.NewNewMemberBody(member.Username)
 	resp := model.StatusOK(data)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(&resp)

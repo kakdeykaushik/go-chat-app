@@ -22,13 +22,13 @@ func NewMemberSvc(client *mongo.Client, config *db.Configuration, live types.Sto
 	return memberSvc{db: client, config: config, liveConn: live}
 }
 
-func (ms *memberSvc) CreateMember(username string, socket *websocket.Conn) (*model.Member, error) {
+func (ms *memberSvc) CreateMember(username string) (*model.Member, error) {
 
 	m, err := ms.GetMember(username)
 	// error - member does not exists
 	if err == mongo.ErrNoDocuments {
 
-		member := model.NewMember(username, socket)
+		member := model.NewMember(username, nil)
 
 		memberEntity := model.ModelToEntityMember(member)
 

@@ -29,8 +29,6 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	chatApp := getChatApp()
 
-	// todo: add more feature APIs like create member etc. Think about it
-
 	// actual routes
 
 	switch {
@@ -46,6 +44,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		chatApp.LeaveRoom(w, r)
 	case r.URL.Path == "/room/" && r.Method == http.MethodPost:
 		chatApp.ChatRoom(w, r)
+	case r.URL.Path == "/member/add" && r.Method == http.MethodPost:
+		chatApp.NewMember(w, r)
 	default:
 		http.NotFound(w, r)
 	}
