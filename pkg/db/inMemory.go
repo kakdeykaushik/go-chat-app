@@ -47,5 +47,3 @@ func (s *inMemoryStorage) Delete(K string) error {
 	s.items.Delete(K)
 	return nil
 }
-
-// todo; how to handle cache invalidation

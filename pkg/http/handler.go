@@ -42,7 +42,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		chatApp.ViewRoom(w, r)
 	case r.URL.Path == "/room/leave" && r.Method == http.MethodDelete:
 		chatApp.LeaveRoom(w, r)
-	case r.URL.Path == "/room/" && r.Method == http.MethodPost:
+	case r.URL.Path == "/room/":
 		chatApp.ChatRoom(w, r)
 	case r.URL.Path == "/member/add" && r.Method == http.MethodPost:
 		chatApp.NewMember(w, r)
