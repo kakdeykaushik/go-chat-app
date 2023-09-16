@@ -1,24 +1,5 @@
+<!-- todo - design  thoda change -->
 <html>
-  <div>
-    <input id="email" type="email" size="40" />
-    <button onclick="connect()">Connect</button>
-    <pre id="socket-connection"></pre>
-
-    <label> <input type="radio" name="channel" value="room" /> Room </label>
-    <br />
-    <label> <input type="radio" name="channel" value="individual" /> Individual </label>
-    <br />
-
-    UID: <input id="uid" type="text" size="40" />
-
-
-    <br />
-
-    message
-    <input id="input" type="text" size="40" />
-    <button onclick="send()">Send</button>
-    <pre id="output"></pre>
-  </div>
   <style>
     html {
       text-align: center;
@@ -34,6 +15,29 @@
       font-size: 16px;
     }
   </style>
+  <body>
+    <div>
+      <input id="email" type="email" size="40" />
+      <button onclick="connect()">Connect</button>
+      <pre id="socket-connection"></pre>
+
+      <h4>Send to</h4>
+      <label> <input type="radio" name="channel" value="room" /> Room </label>
+      <br />
+      <!-- <label> <input type="radio" name="channel" value="individual" /> Individual </label> -->
+      <br />
+      <p>roomid / username:</p>
+       <input id="uid" type="text" size="40" />
+      <br />
+      <p>Enter message</p>
+      <input id="input" type="text" size="40" />
+      <button onclick="send()">Send</button>
+
+      <p>Messages will be displayed here</p>
+      <pre id="output"></pre>
+    </div>
+  </body>
+
   <script>
     var input = document.getElementById("input");
     var output = document.getElementById("output");
