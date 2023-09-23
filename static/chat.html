@@ -24,7 +24,7 @@
       <h4>Send to</h4>
       <label> <input type="radio" name="channel" value="room" /> Room </label>
       <br />
-      <!-- <label> <input type="radio" name="channel" value="individual" /> Individual </label> -->
+      <label> <input type="radio" name="channel" value="individual" /> Individual </label>
       <br />
       <p>roomid / username:</p>
        <input id="uid" type="text" size="40" />
@@ -52,7 +52,7 @@
       };
 
       socket.onmessage = function (e) {
-        data = JSON.parse(e.data);
+                data = JSON.parse(e.data);
 
         const messageType = data.messageType;
         const sender = data.sender;
