@@ -4,6 +4,7 @@ import (
 	"chat-app/pkg/app"
 	"chat-app/pkg/db"
 	"chat-app/pkg/utils"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -32,6 +33,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// actual routes
 
 	switch {
+	case r.URL.Path == "/healthcheck":
+		w.Write([]byte("ok"))
 	case r.URL.Path == "/", r.URL.Path == "/home" && r.Method == http.MethodGet:
 		chatApp.Home(w, r)
 	case r.URL.Path == "/room/new" && r.Method == http.MethodPost:
@@ -58,6 +61,10 @@ func getChatApp() *app.ChatApp {
 	// use db.NewDB to get mongo store? - probably NO bcz here i dont want to provide entity T
 	dbClient, err := db.GetClient()
 	utils.FatalError(err, "error while connecting to DB")
+
+	if err := dbClient.Ping(context.Background(), nil); err != nil {
+		utils.FatalError(err, "error while pinging DB")
+	}
 
 	memberDBConfig := db.NewConfiguration(utils.DB_CHATROOM, utils.COLLECTION_MEMBER, "username")
 	roomDBConfig := db.NewConfiguration(utils.DB_CHATROOM, utils.COLLECTION_ROOM, "roomId")
